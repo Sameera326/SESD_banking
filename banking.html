@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Banking App — Patterns Demo</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#93a3bd;--accent:#60a5fa;--ok:#34d399;--danger:#fb7185}
+    *{box-sizing:border-box;font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071023 0%, #071428 60%);color:#e6eef8;padding:28px}
+    .wrap{max-width:980px;margin:0 auto}
+    h1{margin:0 0 12px;font-size:20px}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    .card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(2,6,23,.6)}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type=text],select,input[type=number]{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,.04);background:#071127;color:inherit}
+    button{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;color:#04243b;cursor:pointer;font-weight:600}
+    .muted{color:var(--muted);font-size:13px}
+    .controls{display:flex;gap:8px;margin-top:8px}
+    .list{max-height:320px;overflow:auto;margin-top:12px}
+    .account-row{display:flex;justify-content:space-between;align-items:center;padding:8px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,0.01),transparent);margin-bottom:8px}
+    .badge{font-size:12px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.03)}
+    .buttons{display:flex;gap:6px}
+    .note{font-size:13px;color:var(--muted);margin-top:8px}
+    .notifications{max-height:200px;overflow:auto;padding:8px;border-radius:8px;background:#071127;margin-top:10px}
+    .notif{padding:8px;border-left:3px solid rgba(255,255,255,.03);margin-bottom:8px}
+    .footer{margin-top:14px;color:var(--muted);font-size:13px}
+    .row{display:flex;gap:8px}
+    .small{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Banking App — Observer, Strategy, Command (Demo)</h1>
+    <div class="grid">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="muted">Create account</div>
+            <div class="note">Enter name, type and initial balance</div>
+          </div>
+          <div class="small">Patterns: Observer • Strategy • Command</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>Name</label>
+          <input id="acctName" type="text" placeholder="e.g. Alice" />
+          <label style="margin-top:8px">Account Type</label>
+          <select id="acctType">
+            <option value="savings">Savings</option>
+            <option value="fixed">Fixed Deposit</option>
+            <option value="current">Current</option>
+          </select>
+          <label style="margin-top:8px">Initial Balance</label>
+          <input id="acctBalance" type="number" value="1000" />
+          <div class="controls">
+            <button id="createAcct">Create Account</button>
+            <button id="seedDemo">Create Demo Accounts</button>
+          </div>
+        </div>
+
+        <hr style="margin:14px 0;border:none;border-top:1px solid rgba(255,255,255,.03)" />
+
+        <div>
+          <div class="muted">Accounts</div>
+          <div id="accounts" class="list"></div>
+        </div>
+
+        <div class="footer">Tip: Use deposit / withdraw / transfer buttons to create commands. Undo via "Undo Last".</div>
+      </div>
+
+      <div class="card">
+        <div>
+          <div class="muted">Selected Account</div>
+          <div id="selectedInfo" style="margin-top:8px">No account selected</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label>Amount</label>
+          <input id="amount" type="number" value="100" />
+          <div class="row" style="margin-top:8px">
+            <button id="btnDeposit">Deposit</button>
+            <button id="btnWithdraw">Withdraw</button>
+            <button id="btnTransfer">Transfer</button>
+          </div>
+          <div class="note">Transfer: select source then target account in prompt.</div>
+
+          <div style="margin-top:12px">
+            <label>Interest Strategy</label>
+            <select id="interestSelect">
+              <option value="savings">Savings (4%)</option>
+              <option value="fixed">Fixed Deposit (6%)</option>
+              <option value="current">Current (0%)</option>
+            </select>
+            <div style="margin-top:8px" class="controls">
+              <button id="applyInterest">Calculate Interest</button>
+              <button id="undo">Undo Last</button>
+            </div>
+          </div>
+
+          <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,.03)" />
+
+          <div>
+            <label>Add Observer (notification)</label>
+            <input id="obsName" type="text" placeholder="e.g. Alice-email" />
+            <div class="controls" style="margin-top:8px">
+              <button id="addObserver">Add Observer</button>
+              <button id="clearNotifs">Clear Notifications</button>
+            </div>
+            <div class="notifications" id="notifications"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px" class="card">
+      <div class="muted">Console / Activity Log</div>
+      <div id="log" style="margin-top:8px;max-height:180px;overflow:auto;padding:8px;background:#06101a;border-radius:8px"></div>
+    </div>
+  </div>
+
+  <script>
+    /* =========================
+       Patterns implemented in JS
+       - Observer: Account maintains observers (callbacks)
+       - Strategy: InterestStrategy classes
+       - Command: Command objects with execute/undo and history
+       ========================= */
+
+    // ---------- Utilities ----------
+    const $ = id => document.getElementById(id);
+    const log = (...args) => {
+      const el = $('log');
+      const p = document.createElement('div');
+      p.style.padding='6px 0';
+      p.style.borderBottom='1px solid rgba(255,255,255,.02)';
+      p.textContent = args.join(' ');
+      el.prepend(p);
+    };
+
+    // ---------- Observer Pattern (Account subject) ----------
+    class Account {
+      constructor(id, owner, balance = 0, type='savings'){
+        this.id = id; this.owner = owner; this._balance = balance; this.type = type;
+        this.observers = [];
+      }
+      get balance(){ return this._balance }
+      // encapsulated mutation methods
+      deposit(amount){ this._balance += amount; this.notify('deposit', amount); }
+      withdraw(amount){ this._balance -= amount; this.notify('withdraw', amount); }
+      // Observer management
+      addObserver(o){ this.observers.push(o); }
+      removeObserver(o){ this.observers = this.observers.filter(x=>x !== o); }
+      notify(event, amount){
+        const payload = {account:this, event, amount, balance:this._balance, time: new Date()};
+        this.observers.forEach(obs => obs.update(payload));
+      }
+    }
+
+    // Observer implementation: a simple object with update()
+    class CustomerNotification {
+      constructor(name){ this.name = name; }
+      update(payload){
+        // Simulate sending notification: add to UI list
+        const nbox = $('notifications');
+        const div = document.createElement('div');
+        div.className = 'notif';
+        div.innerHTML = <strong>${this.name}</strong> — ${payload.event} ₹${payload.amount} | Balance: ₹${payload.balance} <div class="small">${payload.time.toLocaleString()}</div>;
+        nbox.prepend(div);
+        log(Notify ${this.name}: ${payload.event} ₹${payload.amount} on ${payload.account.owner}. New bal: ₹${payload.balance});
+      }
+    }
+
+    // ---------- Strategy Pattern: Interest strategies ----------
+    class InterestStrategy {
+      calculate(balance){ return 0 }
+    }
+    class SavingsInterest extends InterestStrategy{ calculate(b){ return b * 0.04 } }
+    class FixedInterest extends InterestStrategy{ calculate(b){ return b * 0.06 } }
+    class CurrentInterest extends InterestStrategy{ calculate(b){ return 0 } }
+
+    function strategyFactory(type){
+      switch(type){
+        case 'savings': return new SavingsInterest();
+        case 'fixed': return new FixedInterest();
+        case 'current': return new CurrentInterest();
+        default: return new SavingsInterest();
+      }
+    }
+
+    // ---------- Command Pattern ----------
+    class Command {
+      execute(){}
+      undo(){}
+    }
+
+    class DepositCommand extends Command{
+      constructor(account, amount){ super(); this.account = account; this.amount = amount }
+      execute(){ this.account.deposit(this.amount); }
+      undo(){ this.account.withdraw(this.amount); }
+    }
+
+    class WithdrawCommand extends Command{
+      constructor(account, amount){ super(); this.account = account; this.amount = amount }
+      execute(){ this.account.withdraw(this.amount); }
+      undo(){ this.account.deposit(this.amount); }
+    }
+
+    class TransferCommand extends Command{
+      constructor(from, to, amount){ super(); this.from = from; this.to = to; this.amount = amount }
+      execute(){ this.from.withdraw(this.amount); this.to.deposit(this.amount); }
+      undo(){ this.to.withdraw(this.amount); this.from.deposit(this.amount); }
+    }
+
+    class TransactionManager{
+      constructor(){ this.history = [] }
+      executeCommand(cmd){ cmd.execute(); this.history.push(cmd); log('Executed:', cmd.constructor.name); }
+      undoLast(){ const cmd = this.history.pop(); if(cmd){ cmd.undo(); log('Undid:', cmd.constructor.name); } else log('No command to undo'); }
+    }
+
+    // ---------- App State ----------
+    const state = { accounts: [], selected: null, tm: new TransactionManager(), nextId: 1 };
+
+    // ---------- UI Helpers ----------
+    function renderAccounts(){
+      const box = $('accounts'); box.innerHTML='';
+      state.accounts.forEach(a=>{
+        const div = document.createElement('div'); div.className='account-row';
+        div.innerHTML = `<div>
+            <strong>${a.owner}</strong> <div class="small">#${a.id} • ${a.type}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="badge">₹${a.balance.toFixed(2)}</div>
+            <div class="buttons" style="margin-top:6px">
+              <button data-id="${a.id}" class="selectBtn">Select</button>
+            </div>
+          </div>`;
+        box.appendChild(div);
+      });
+      // attach select handlers
+      document.querySelectorAll('.selectBtn').forEach(b=>b.addEventListener('click', ()=>{
+        const id = Number(b.getAttribute('data-id'));
+        state.selected = state.accounts.find(x=>x.id===id);
+        renderSelected();
+      }));
+    }
+
+    function renderSelected(){
+      if(!state.selected){ $('selectedInfo').innerHTML='No account selected'; return; }
+      const a = state.selected;
+      $('selectedInfo').innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong>${a.owner}</strong><div class="small">#${a.id} • Type: ${a.type}</div></div>
+        <div><div class="badge">₹${a.balance.toFixed(2)}</div></div>
+      </div>`;
+    }
+
+    // ---------- Actions ----------
+    $('createAcct').addEventListener('click', ()=>{
+      const name = $('acctName').value.trim() || 'User'+state.nextId;
+      const type = $('acctType').value;
+      const bal = Number($('acctBalance').value) || 0;
+      const a = new Account(state.nextId++, name, bal, type);
+      // default observer: owner-email simulation
+      a.addObserver(new CustomerNotification(name+"-notify"));
+      state.accounts.push(a);
+      log('Account created:', a.owner, a.id, a.type, 'bal', a.balance);
+      renderAccounts();
+    });
+
+    $('seedDemo').addEventListener('click', ()=>{
+      // create two accounts
+      const a1 = new Account(state.nextId++, 'Alice', 1500,'savings'); a1.addObserver(new CustomerNotification('alice@mail'));
+      const a2 = new Account(state.nextId++, 'Bob', 800,'current'); a2.addObserver(new CustomerNotification('bob@mail'));
+      state.accounts.push(a1,a2); renderAccounts(); log('Demo accounts created');
+    });
+
+    $('addObserver').addEventListener('click', ()=>{
+      if(!state.selected){ alert('Select an account first'); return; }
+      const name = $('obsName').value.trim(); if(!name){ alert('Enter observer id'); return; }
+      state.selected.addObserver(new CustomerNotification(name)); log('Observer added to', state.selected.owner, name);
+      $('obsName').value = '';
+    });
+
+    $('btnDeposit').addEventListener('click', ()=>{
+      if(!state.selected){ alert('Select account'); return; }
+      const amt = Number($('amount').value) || 0;
+      const cmd = new DepositCommand(state.selected, amt);
+      state.tm.executeCommand(cmd); renderAccounts(); renderSelected();
+    });
+
+    $('btnWithdraw').addEventListener('click', ()=>{
+      if(!state.selected){ alert('Select account'); return; }
+      const amt = Number($('amount').value) || 0;
+      const cmd = new WithdrawCommand(state.selected, amt);
+      state.tm.executeCommand(cmd); renderAccounts(); renderSelected();
+    });
+
+    $('btnTransfer').addEventListener('click', ()=>{
+      if(!state.selected){ alert('Select source account'); return; }
+      const amt = Number($('amount').value) || 0;
+      const targetId = Number(prompt('Enter destination account id'));
+      const target = state.accounts.find(x=>x.id===targetId);
+      if(!target){ alert('Invalid destination'); return; }
+      const cmd = new TransferCommand(state.selected, target, amt);
+      state.tm.executeCommand(cmd); renderAccounts(); renderSelected();
+    });
+
+    $('applyInterest').addEventListener('click', ()=>{
+      if(!state.selected){ alert('Select account'); return; }
+      const strat = strategyFactory($('interestSelect').value);
+      const interest = strat.calculate(state.selected.balance);
+      alert(Interest for ${state.selected.owner}: ₹${interest.toFixed(2)});
+      log('Interest calculated for', state.selected.owner, '₹'+interest.toFixed(2));
+    });
+
+    $('undo').addEventListener('click', ()=>{
+      state.tm.undoLast(); renderAccounts(); renderSelected();
+    });
+
+    $('clearNotifs').addEventListener('click', ()=>{ $('notifications').innerHTML=''; });
+
+    // init
+    renderAccounts(); renderSelected();
+  </script>
+</body>
+</html>
